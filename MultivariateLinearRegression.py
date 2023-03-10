@@ -21,25 +21,22 @@ class MultivariateLinearRegression:
         n_samples, n_features = X.shape
         self.weights =np.ones(n_features).reshape(-1,1)
         self.bias = 0
-        n=0
         kf = KFold(n_splits=self.n_folds, shuffle=True)
+        #交叉验证
         for i in range(self.n_iterations):
             for train_idx, val_idx in kf.split(X):
                 X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
                 X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
                 X_train=X_train.values
-                    
                 y_train=np.array(y_train).reshape(-1,1)
                 X_val=np.array(X_val)
                 y_val=np.array(y_val).reshape(-1,1)
                 y_pred_train = np.dot(X_train, self.weights) + self.bias
                 y_pred_val = np.dot(X_val, self.weights) + self.bias
-                y_pred_train_logic=sigmoid(y_pred_train)
-                y_pred_val_logic=sigmoid(y_pred_val)
                 train_loss = np.mean(np.square(y_pred_train- y_train))
                 val_loss = np.mean(np.square(y_pred_val - y_val))
-                dw = (1 / n_samples) * np.dot(X_train.T, (y_pred_train - y_train))#线性回归梯度
-                db = (2 / n_samples) * np.sum(y_pred_train - y_train)
+                dw = (1 / n_samples) * np.dot(X_train.T, (y_pred_train - y_train))#线性回归weight梯度
+                db = (2 / n_samples) * np.sum(y_pred_train - y_train)#bias梯度
                 self.weights -= self.learning_rate * dw
                 self.bias -= self.learning_rate * db
             if i % 100 == 0:
@@ -52,6 +49,8 @@ class MultivariateLinearRegression:
 
 class LassoRegression:
     def __init__(self, learning_rate=0.01, n_iterations=2000, n_folds=5,Lambda=0,iteration_method='GDT'):
+        #Lambda是L1正则系数。默认为0，也就退化成线性回归,lasso回归就是比线性回归多了L1正则
+        #iteration_method是使损失函数收敛的方法，GDT是梯度下降，CDT是坐标下降
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.n_folds = n_folds
@@ -64,8 +63,8 @@ class LassoRegression:
         n_samples, n_features = X.shape
         self.weights =np.ones(n_features).reshape(-1,1)
         self.bias = 0
-        n=0
         kf = KFold(n_splits=self.n_folds, shuffle=True)
+        #交叉验证
         for i in range(self.n_iterations):
             for train_idx, val_idx in kf.split(X):
                 X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
@@ -81,6 +80,7 @@ class LassoRegression:
                 if self.iteration_method=='CDT':
                     for i,item in enumerate(self.weights):
                         #在每一个W值上找到使损失函数收敛的点
+                        #CDT可能会迭代速度很慢，因此这里只迭代50次，调大可能更接近于收敛，但是慢
                             for j in range(50):
                                 y_pred_train = np.dot(X_train, self.weights) + self.bias
                                 y_pred_val = np.dot(X_val, self.weights) + self.bias
@@ -89,7 +89,7 @@ class LassoRegression:
                                 if abs(dw)<1e-3:
                                     break
                 else:
-                    dw = (1 / n_samples) * np.dot(X_train.T, (y_pred_train - y_train))+self.Lambda* np.sign(self.weights)#线性回归梯度
+                    dw = (1 / n_samples) * np.dot(X_train.T, (y_pred_train - y_train))+self.Lambda* np.sign(self.weights)
                     self.weights -= self.learning_rate * dw
                 db = (2 / n_samples) * np.sum(y_pred_train - y_train)
                 self.bias -= self.learning_rate * db
@@ -101,13 +101,13 @@ class LassoRegression:
         return y_pred
 
 
-
+#以下为特征工程
 train = pd.read_csv('sale prediction/train.csv')
 test = pd.read_csv('sale prediction/test.csv')
 submission=pd.read_csv('sale prediction/sample_submission.csv')
 features=['row_id','cfips','county','state','first_day_of_month','active']
 
-df = pd.concat([train, test])
+df = pd.concat([train, test])#合并测试集和训练集，做同样处理
 
 df['Outlet_Size_Medium']=np.zeros(df.shape[0])
 df['Outlet_Size_High']=np.zeros(df.shape[0])
@@ -143,6 +143,7 @@ x_train = train[feats]
 y_train = train[label]
 x_test=test[feats]
 
+#因为Item_Weight中有空值，这里通过MLP神经网络来预测空值
 XX_train=train[train['Item_Weight'].notna()].reset_index(drop=True)
 YY_train=XX_train['Item_Weight']
 XX_val=train[train['Item_Weight'].isna()].reset_index(drop=True)
@@ -152,8 +153,6 @@ new_XX_val=XX_val[new_f]
 mlp = MLPRegressor()
 mlp.fit(new_XX_train,YY_train)
 YY_val=mlp.predict(new_XX_val)
-
-
 XX_val['Item_Weight']=YY_val
 train = pd.concat([XX_train, XX_val]).reset_index(drop=True)
 x_train=train[feats]
@@ -161,15 +160,16 @@ y_train=train[label]
 x_test=x_test[x_test['Item_Weight'].notna()]
 x_train.to_csv('cat.csv', index=False)
 
-
-model= MultivariateLinearRegression()
-model1=LassoRegression(Lambda=36,iteration_method='CDT')
 #y_train=np.log10(y_train)#防止溢出，进行放缩处理
-#归一化
+#用最大最小归一化的方法来归一化训练集
 for f in x_train:
     if np.mean(x_train[f])>1.0:
         x_train[f]=(x_train[f]-np.min(x_train[f]))/(np.max(x_train[f])-np.min(x_train[f]))
         x_test[f]=(x_test[f]-np.min(x_test[f]))/(np.max(x_test[f])-np.min(x_test[f]))
+        
+        
+model= MultivariateLinearRegression()
+model1=LassoRegression(Lambda=36,iteration_method='CDT')
 model1.fit(x_train,y_train)
 y_test=model1.predict(x_test)
 print('手写模型预测结果：')
