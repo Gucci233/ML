@@ -1,0 +1,34 @@
+from sklearn.preprocessing import PolynomialFeatures
+from itertools import combinations_with_replacement
+import numpy as np
+# 创建一个3x2的矩阵作为原始特征
+X =np.array( [[0, 1,2], [2, 3,4], [4, 5,6]])
+
+# 创建一个PolynomialFeatures对象，设置degree参数为2
+poly = PolynomialFeatures(degree=3)
+
+# 将原始特征转换为二次多项式特征
+X_poly = poly.fit_transform(X)
+
+# 输出转换后的多项式特征
+print(X_poly)
+
+
+def polynomial_features(X, degree=3, interaction_only=False):
+    n_samples, n_features = X.shape
+    
+    combinations=[]
+    for d in range(1,degree+1):
+        combinations+=[comb for comb in combinations_with_replacement(
+            range(n_features), d) if not interaction_only or len(set(comb)) == degree]
+    print(combinations)
+    n_output_features = len(combinations)+1
+    PF_array = np.empty((n_samples, n_output_features))
+    PF_array[:, 0] = 1
+    for i, comb in enumerate(combinations):
+        PF_array[:, i+1] = X[:, comb].prod(1)
+
+    return PF_array
+print(polynomial_features(X))
+# for comb in combinations_with_replacement([0,1,2], 3):
+#     print(comb)
