@@ -3,8 +3,7 @@ import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neural_network import MLPRegressor
-from sklearn.linear_model import LinearRegression,LogisticRegression,LassoCV
-import lightgbm as lgb
+from sklearn.linear_model import LinearRegression
 from itertools import combinations_with_replacement
 def sigmoid(x):
     return 1.0/(1+np.exp(-x))
@@ -34,11 +33,12 @@ class PolynomialRegression:
         self.weights = None
         self.bias = None
 
+        
     def fit(self, X, y):
         X_poly = polynomial_features(X, degree=2)
-        print(type(X_poly))
+        #print(type(X_poly))
         n_samples, n_features = X_poly.shape
-        print(X.shape,X_poly.shape)
+        #print(X.shape,X_poly.shape)
         self.weights =np.ones(n_features).reshape(-1,1)
         self.bias = 0
         
@@ -56,7 +56,7 @@ class PolynomialRegression:
                 y_pred_val = np.dot(X_val, self.weights) + self.bias
                 train_loss = np.mean(np.square(y_pred_train- y_train))
                 val_loss = np.mean(np.square(y_pred_val - y_val))
-                dw = (1 / n_samples) * np.dot(X_train.T, (y_pred_train - y_train))#线性回归weight梯度
+                dw = (1 / n_samples) * np.dot(X_train.T, (y_pred_train - y_train))+ 0.005* np.sign(self.weights)#线性回归weight梯度
                 db = (2 / n_samples) * np.sum(y_pred_train - y_train)#bias梯度
                 self.weights -= self.learning_rate * dw
                 self.bias -= self.learning_rate * db
@@ -219,28 +219,38 @@ y_train=train[label]
 x_test=x_test[x_test['Item_Weight'].notna()]
 x_train.to_csv('cat.csv', index=False)
 
-#y_train=np.log10(y_train)#防止溢出，进行放缩处理
 #用最大最小归一化的方法来归一化训练集
 for f in x_train:
     if np.mean(x_train[f])>1.0:
         x_train[f]=(x_train[f]-np.min(x_train[f]))/(np.max(x_train[f])-np.min(x_train[f]))
         x_test[f]=(x_test[f]-np.min(x_test[f]))/(np.max(x_test[f])-np.min(x_test[f]))
         
-model= PolynomialRegression()
-model.fit(x_train,y_train)
 # model= MultivariateLinearRegression()
 # model.fit(x_train,y_train)
-# model1=LassoRegression(Lambda=36,iteration_method='CDT')
-# model1.fit(x_train,y_train)
-y_test=model.predict(x_test)
-print('手写模型预测结果：')
-print(y_test)
-
+model1=LassoRegression(Lambda=36,iteration_method='CDT')
+model1.fit(x_train,y_train)
 l=LinearRegression()
 l.fit(x_train,y_train)
 l.predict(x_test)
 y_pred_linear=l.predict(x_test)
+
+
+y_train=y_train/1000#防止溢出，进行放缩处理
+model= PolynomialRegression()
+model.fit(x_train,y_train)
+
+model1=LassoRegression(Lambda=0.1,iteration_method='CDT')
+model1.fit(x_train,y_train)
+
+y_test_lasso=model1.predict(x_test)
+y_test=model.predict(x_test)
+
 print('调库线性回归预测结果')
 print(y_pred_linear)
+print('手写多项式模型预测结果：')
+print(y_test*1000)
+print('手写lasso回归模型预测结果：')
+print(y_test_lasso*1000)
+
 
 
