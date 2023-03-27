@@ -51,7 +51,7 @@ class MultivariateLinearRegression:
             val_loss_list.append(val_loss)
             if i % 100 == 0:
                 print(f"Iteration {i}, train_loss={train_loss:.4f}, val_loss={val_loss:.4f}")
-        draw("LinearRegerssion loss",train_loss_list,val_loss_list)
+        #draw("LinearRegerssion loss",train_loss_list,val_loss_list)
 
     def predict(self, X):
         y_pred = np.dot(X, self.weights) + self.bias
